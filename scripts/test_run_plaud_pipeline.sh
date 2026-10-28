@@ -47,6 +47,7 @@ chmod +x "$FAKE_BIN/osascript"
 
 export CURL_LOG="$TEST_ROOT/curl.log"
 export CURL_DATA_FILE="$TEST_ROOT/curl_data.json"
+export CURL_HEADERS_FILE="$TEST_ROOT/curl_headers.txt"
 cat > "$FAKE_BIN/curl" <<'EOF'
 #!/bin/bash
 if [ -n "${CURL_LOG:-}" ]; then
@@ -56,6 +57,46 @@ if [ -n "${CURL_LOG:-}" ]; then
   done
   printf '\n' >> "$CURL_LOG"
 fi
+
+# Capture -H @file (read header files)
+headers_target="${CURL_HEADERS_FILE:-${CURL_HEADER_FILE:-}}"
+if [ -z "$headers_target" ] && [ -n "${CURL_LOG:-}" ]; then
+  headers_target="$(dirname "$CURL_LOG")/curl_headers.txt"
+fi
+
+header_next=0
+for a in "$@"; do
+  if [ "$header_next" -eq 1 ]; then
+    if [[ "$a" == @* ]]; then
+      hfile="${a#@}"
+      if [ -e "$hfile" ] || [ -r "$hfile" ]; then
+        hcontent=$(cat "$hfile" 2>/dev/null || true)
+        if [ -n "$headers_target" ]; then
+          printf '%s\n' "$hcontent" >> "$headers_target"
+        fi
+      fi
+    fi
+    header_next=0
+  elif [ "$a" = "-H" ] || [ "$a" = "--header" ]; then
+    header_next=1
+  elif [[ "$a" == -H@* ]]; then
+    hfile="${a#-H@}"
+    if [ -e "$hfile" ] || [ -r "$hfile" ]; then
+      hcontent=$(cat "$hfile" 2>/dev/null || true)
+      if [ -n "$headers_target" ]; then
+        printf '%s\n' "$hcontent" >> "$headers_target"
+      fi
+    fi
+  elif [[ "$a" == --header=@* ]]; then
+    hfile="${a#--header=@}"
+    if [ -e "$hfile" ] || [ -r "$hfile" ]; then
+      hcontent=$(cat "$hfile" 2>/dev/null || true)
+      if [ -n "$headers_target" ]; then
+        printf '%s\n' "$hcontent" >> "$headers_target"
+      fi
+    fi
+  fi
+done
 
 # Capture -d data
 data_next=0
@@ -560,7 +601,7 @@ echo "PASS: topic '../../etc' wrote under notes_dir/misc/"
 # ==============================================================================
 # Scenario 13: Notion body built with jq --arg and title containing quotes produces valid JSON
 # ==============================================================================
-rm -f "$CURL_LOG" "$CURL_DATA_FILE"
+rm -f "$CURL_LOG" "$CURL_DATA_FILE" "$CURL_HEADERS_FILE"
 echo '[]' > "$TEST_ROOT/state/processed_ids.json"
 echo '{}' > "$TEST_ROOT/state/attempts.json"
 
@@ -624,6 +665,20 @@ EXPECTED_TITLE="Meeting with \"Acme Corp\" & 'Partners'"
 [ "$CAPTURED_TITLE" = "$EXPECTED_TITLE" ] || fail "captured Notion title mismatch: got '$CAPTURED_TITLE'"
 
 echo "PASS: Notion body built with jq --arg and title containing quotes produced valid JSON"
+
+# Assert (a): the token value appears nowhere in the logged argv
+[ -f "$CURL_LOG" ] || fail "curl was not called / CURL_LOG not created"
+if grep -q -F "$NOTION_TOKEN" "$CURL_LOG"; then
+  fail "token value '$NOTION_TOKEN' was found in the logged curl argv ($CURL_LOG)"
+fi
+
+# Assert (b): the header file the fake curl read contains Authorization: Bearer <token>
+[ -f "$CURL_HEADERS_FILE" ] || fail "fake curl did not read any header file from -H @file"
+if ! grep -q -F "Authorization: Bearer ${NOTION_TOKEN}" "$CURL_HEADERS_FILE"; then
+  fail "header file read by fake curl does not contain 'Authorization: Bearer ${NOTION_TOKEN}'"
+fi
+
+echo "PASS: Notion token kept out of curl argv and verified in header file read by curl"
 
 # ==============================================================================
 # Scenario 14: Failed Reminders call leaves ID out of processed_ids.json and increments attempts

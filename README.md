@@ -61,7 +61,7 @@ This pipeline fixes that cost bug by running a local gate before Claude is ever 
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/plaud-notes-autopilot.git
+   git clone https://github.com/karan2439-lang/plaud-notes-autopilot.git
    cd plaud-notes-autopilot
    ```
 

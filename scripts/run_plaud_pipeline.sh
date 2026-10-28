@@ -411,7 +411,7 @@ for id in "${BATCH[@]}"; do
 
       set +e
       SEARCH_RESP=$(curl -s -f -X POST "https://api.notion.com/v1/databases/${NOTION_DB_ID}/query" \
-        -H "Authorization: Bearer ${notion_token}" \
+        -H @<(printf 'Authorization: Bearer %s\n' "$notion_token") \
         -H "Notion-Version: 2022-06-28" \
         -H "Content-Type: application/json" \
         -d "$SEARCH_PAYLOAD" 2>&1)
@@ -508,7 +508,7 @@ for id in "${BATCH[@]}"; do
 
           set +e
           CREATE_RESP=$(curl -s -f -X POST "https://api.notion.com/v1/pages" \
-            -H "Authorization: Bearer ${notion_token}" \
+            -H @<(printf 'Authorization: Bearer %s\n' "$notion_token") \
             -H "Notion-Version: 2022-06-28" \
             -H "Content-Type: application/json" \
             -d "$PAGE_PAYLOAD" 2>&1)
