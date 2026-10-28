@@ -28,27 +28,78 @@ get_new_recording_ids() {
   return 0
 }
 
-has_valid_transcript() {
+get_transcript_text() {
   local id="$1"
-  local output
-  local exit_code
+  local output=""
+  local exit_code=1
+  local clean=""
+  local non_ws=""
+
+  set +e
+  output=$(plaud transcript --polished "$id" 2>/dev/null)
+  exit_code=$?
+  set -e
+
+  if [ "$exit_code" -eq 0 ] && [ -n "$output" ]; then
+    clean=$(printf '%s\n' "$output" | strip_ansi | sed -E '/^[[:space:]]*(- Fetching|[✔✗✓]|Transcript:)/d')
+    non_ws=$(printf '%s' "$clean" | tr -d '[:space:]')
+    if [ "${#non_ws}" -ge 20 ]; then
+      printf '%s\n' "$clean"
+      return 0
+    fi
+  fi
 
   set +e
   output=$(plaud transcript "$id" 2>/dev/null)
   exit_code=$?
   set -e
 
-  if [ "$exit_code" -ne 0 ]; then
+  if [ "$exit_code" -eq 0 ] && [ -n "$output" ]; then
+    clean=$(printf '%s\n' "$output" | strip_ansi | sed -E '/^[[:space:]]*(- Fetching|[✔✗✓]|Transcript:)/d')
+    non_ws=$(printf '%s' "$clean" | tr -d '[:space:]')
+    if [ "${#non_ws}" -ge 20 ]; then
+      printf '%s\n' "$clean"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+has_valid_transcript() {
+  local id="$1"
+  get_transcript_text "$id" >/dev/null 2>&1
+}
+
+get_recording_date() {
+  local id="$1"
+  local output=""
+  local exit_code=1
+
+  set +e
+  output=$(plaud file "$id" 2>/dev/null)
+  exit_code=$?
+  set -e
+
+  if [ "$exit_code" -ne 0 ] || [ -z "$output" ]; then
     return 1
   fi
 
-  local clean
-  clean=$(printf '%s' "$output" | strip_ansi | sed -E '/^[[:space:]]*(- Fetching|[✔✗✓]|Transcript:)/d' | tr -d '[:space:]')
-  if [ "${#clean}" -lt 20 ]; then
-    return 1
+  local clean_out
+  clean_out=$(printf '%s\n' "$output" | strip_ansi)
+
+  local d
+  d=$(printf '%s\n' "$clean_out" | grep -i 'created_at' | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -n 1 || true)
+  if [ -z "$d" ]; then
+    d=$(printf '%s\n' "$clean_out" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -n 1 || true)
   fi
 
-  return 0
+  if [[ "$d" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+    echo "$d"
+    return 0
+  fi
+
+  return 1
 }
 
 get_attempt_count() {

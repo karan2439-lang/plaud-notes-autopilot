@@ -8,3 +8,4 @@ logs/
 processed_ids.json
 prompts/
 state/
+.remember/

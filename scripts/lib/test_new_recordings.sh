@@ -94,38 +94,67 @@ increment_attempt "of_valid" "$TMP_ATTEMPTS"
 [ $(get_attempt_count "of_valid" "$TMP_ATTEMPTS") -eq 2 ] || { echo "FAIL: incrementing valid attempt failed"; exit 1; }
 echo "PASS: attempt tracking functions work atomically and handle non-numeric values"
 
-# Test has_valid_transcript with fake plaud
+# Test has_valid_transcript, get_transcript_text, get_recording_date with fake plaud
 FAKE_BIN="$TMP_DIR/fake_bin"
 mkdir -p "$FAKE_BIN"
 cat > "$FAKE_BIN/plaud" <<'EOF'
 #!/bin/bash
 if [ "$1" = "transcript" ]; then
+  if [ "$2" = "--polished" ]; then
+    case "$3" in
+      of_polished_only)
+        echo -e "- Fetching transcript...\n✔ Done\nTranscript: Polished\n\n[00:00 - 00:20] Speaker 1: This is a polished transcript that should be used directly."
+        exit 0
+        ;;
+      *)
+        exit 1
+        ;;
+    esac
+  else
+    case "$2" in
+      of_valid_id)
+        # Header plus real body with >= 20 non-whitespace chars
+        echo -e "- Fetching transcript...\n\nTranscript: 10-28 Strategic Review\n\n[00:00 - 00:20] Speaker 1: Met with the team to finalize roadmap architecture."
+        exit 0
+        ;;
+      of_header_only_id)
+        # Header lines only, empty body
+        echo -e "- Fetching transcript...\n\nTranscript: 10-28 Empty Call Title\n\n"
+        exit 0
+        ;;
+      of_short_body_id)
+        # Header plus tiny body (< 20 non-whitespace chars)
+        echo -e "- Fetching transcript...\n\nTranscript: 10-28 Call\n\nShort note"
+        exit 0
+        ;;
+      of_status_only_id)
+        # Status icons and headers, no real body
+        echo -e "- Fetching transcript...\n✔ Done\nTranscript: 10-28 Call\n"
+        exit 0
+        ;;
+      of_empty_id)
+        echo "   "
+        exit 0
+        ;;
+      of_error_id)
+        exit 1
+        ;;
+    esac
+  fi
+elif [ "$1" = "file" ]; then
   case "$2" in
-    of_valid_id)
-      # Header plus real body with >= 20 non-whitespace chars
-      echo -e "- Fetching transcript...\n\nTranscript: 10-28 Strategic Review\n\n[00:00 - 00:20] Speaker 1: Met with the team to finalize roadmap architecture."
+    of_valid_id|of_polished_only)
+      echo "File Details:"
+      echo "  id: $2"
+      echo "  created_at: 2026-08-04T12:00:00Z"
       exit 0
       ;;
-    of_header_only_id)
-      # Header lines only, empty body
-      echo -e "- Fetching transcript...\n\nTranscript: 10-28 Empty Call Title\n\n"
+    of_no_date)
+      echo "File Details:"
+      echo "  id: $2"
       exit 0
       ;;
-    of_short_body_id)
-      # Header plus tiny body (< 20 non-whitespace chars)
-      echo -e "- Fetching transcript...\n\nTranscript: 10-28 Call\n\nShort note"
-      exit 0
-      ;;
-    of_status_only_id)
-      # Status icons and headers, no real body
-      echo -e "- Fetching transcript...\n✔ Done\nTranscript: 10-28 Call\n"
-      exit 0
-      ;;
-    of_empty_id)
-      echo "   "
-      exit 0
-      ;;
-    of_error_id)
+    *)
       exit 1
       ;;
   esac
@@ -140,6 +169,36 @@ if has_valid_transcript "of_valid_id"; then
   echo "PASS: header plus real body transcript accepted"
 else
   echo "FAIL: valid transcript was rejected"
+  exit 1
+fi
+
+if has_valid_transcript "of_polished_only"; then
+  echo "PASS: polished transcript preferred and accepted"
+else
+  echo "FAIL: polished transcript was rejected"
+  exit 1
+fi
+
+TXT=$(get_transcript_text "of_polished_only")
+if [[ "$TXT" == *"This is a polished transcript"* ]]; then
+  echo "PASS: get_transcript_text returned cleaned polished content"
+else
+  echo "FAIL: get_transcript_text failed for polished: $TXT"
+  exit 1
+fi
+
+DATE_VAL=$(get_recording_date "of_valid_id")
+if [ "$DATE_VAL" = "2026-08-04" ]; then
+  echo "PASS: get_recording_date extracted created_at date"
+else
+  echo "FAIL: get_recording_date returned $DATE_VAL"
+  exit 1
+fi
+
+if ! get_recording_date "of_no_date" >/dev/null 2>&1; then
+  echo "PASS: get_recording_date rejected output without date"
+else
+  echo "FAIL: get_recording_date accepted output without date"
   exit 1
 fi
 

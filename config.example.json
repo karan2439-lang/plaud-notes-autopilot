@@ -2,10 +2,12 @@
   "notes_dir": "~/Documents/PlaudNotes",
   "notion": {
     "enabled": false,
-    "data_source": ""
+    "database_id": "",
+    "token_env": "NOTION_TOKEN"
   },
   "calendar": {
-    "enabled": false
+    "enabled": false,
+    "calendar_name": "Calendar"
   },
   "reminders": {
     "enabled": true,
