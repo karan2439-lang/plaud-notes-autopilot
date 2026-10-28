@@ -1,0 +1,10 @@
+.DS_Store
+.lock/
+.superpowers/
+config.json
+evidence/
+launch/
+logs/
+processed_ids.json
+prompts/
+state/

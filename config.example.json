@@ -1,0 +1,28 @@
+{
+  "notes_dir": "~/Documents/PlaudNotes",
+  "notion": {
+    "enabled": false,
+    "data_source": ""
+  },
+  "calendar": {
+    "enabled": false
+  },
+  "reminders": {
+    "enabled": true,
+    "list_name": "Plaud Action Items"
+  },
+  "model": "claude-haiku-4-5",
+  "max_budget_usd_per_run": 0.50,
+  "max_attempts": 3,
+  "lookback_days": 7,
+  "schedule": [
+    {
+      "hour": 10,
+      "minute": 0
+    },
+    {
+      "hour": 20,
+      "minute": 0
+    }
+  ]
+}
